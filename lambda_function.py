@@ -20,8 +20,8 @@ def lambda_handler():
     RSS_PAGE = "https://aws.amazon.com/about-aws/whats-new/recent/feed"
     POST_HEADERS = {"Content-Type": "application/json"}
     GET_HEADERS = {"Accept": "application/xml", "Content-Type": "application/xml"}
-    ADDRESS = ""ss
-    ml_services = ['SageMaker', 'Personalize', 'Forecast', 'Elastic Inference', 'EI']
+    ADDRESS = ""s
+    ml_services = ['SageMaker']
 
     xml = requests.get(RSS_PAGE, headers=GET_HEADERS)
     root = ET.fromstring(xml.text)

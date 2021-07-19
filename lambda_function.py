@@ -1,3 +1,5 @@
+# Adapted from https://github.com/aws-samples/aws-news-feed-chime-webhook
+
 import os
 import pytz
 import requests
@@ -8,50 +10,55 @@ import xml.etree.ElementTree as ET
 import time
 
 
-def clean_html(raw_html):
-    reg1 = re.compile('<.*?>')
-    reg2 = re.compile('&nbsp;')
-    clean_text = re.sub(reg1, '', raw_html)
-    cleaner_text = re.sub(reg2, '', clean_text)
-    return cleaner_text
-
-
-def lambda_handler():
+def lambda_handler(event, context):
     RSS_PAGE = "https://aws.amazon.com/about-aws/whats-new/recent/feed"
     POST_HEADERS = {"Content-Type": "application/json"}
     GET_HEADERS = {"Accept": "application/xml", "Content-Type": "application/xml"}
-    ADDRESS = ""s
-    ml_services = ['SageMaker']
+    ADDRESS = "<Slack/MS Teams/Amazon Chime Incoming Webook URL>"
+    AWS_SERVICES = [
+        "SageMaker",
+        "Glue",
+        "Athena",
+    ]
 
     xml = requests.get(RSS_PAGE, headers=GET_HEADERS)
     root = ET.fromstring(xml.text)
 
-    for entry in root.iter('item'):
-        published_datetime = datetime.strptime(entry.find(
-        'pubDate').text,'%a, %d %b %Y %H:%M:%S %z')
-        yesterday_datetime = datetime.now(pytz.utc) - timedelta(days=2)
+    for entry in root.iter("item"):
+        published_datetime = datetime.strptime(
+            entry.find("pubDate").text, "%a, %d %b %Y %H:%M:%S %z"
+        )
+        yesterday_datetime = datetime.now(pytz.utc) - timedelta(days=1)
 
+        # Skip the item if the post was published more than 1 day ago
         if published_datetime < yesterday_datetime:
             continue
+
         publish = False
+        for service in AWS_SERVICES:
+            if entry.find("title").text.__contains__(service):
+                publish = True
+                break
 
-        for service in ml_services: 
-            if(entry.find("title").text.__contains__(service)):
-                publish = True 
+        if publish:
 
-        description = clean_html(entry.find('description').text)
+            # `#x1F680` = Rocket Emoji 
+            # Payload represents format required by MS Teams Incoming Webhooks
+            payload = (
+                "{"
+                + f'"title":"&#x1F680 &#x1F680 &#x1F680 {entry.find("title").text}  &#x1F680 &#x1F680 &#x1F680 " , '
+                + '"text":"'
+                + f'[{entry.find("link").text}]({entry.find("link").text})'
+                + '"}'
+            )
 
-        if(publish):
-            payload = "{\"Content\":\""+entry.find(
-            'title').text+"\\n\\n"+entry.find(
-                'link').text+"\"}"
-            print(payload)
+            print("Payload:", payload)
 
-            response = requests.post(ADDRESS, data=payload.encode('utf-8'),
-                                    headers=POST_HEADERS)
-            print(response.status_code)
+            response = requests.post(
+                ADDRESS, data=payload.encode("utf-8"), headers=POST_HEADERS
+            )
+
+            print("HTTP Response Code", response.status_code)
             time.sleep(1)
 
     return "Done"
-
-lambda_handler()
